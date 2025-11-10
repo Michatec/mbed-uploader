@@ -1,0 +1,76 @@
+name: .NET Core Desktop
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: x86/MbedUploader.sln
+      Test_Project_Path: x86/Mbed.Uploader/MbedUploader.csproj
+      Build_Output_Directory: x86/Mbed.Uploader/bin
+      Directory: x86/Mbed.Uploader
+
+    steps:
+    - name: 🧱 Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🧩 Install .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: ⚙️ Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2
+
+    - name: 🧪 Run Unit Tests
+      run: dotnet test $env:Test_Project_Path --configuration ${{ matrix.configuration }}
+
+    - name: 🔄 Restore Solution
+      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=${{ matrix.configuration }}
+
+    - name: 🏗️ Build Solution
+      run: msbuild $env:Solution_Name /p:Configuration=${{ matrix.configuration }}
+
+    # Optional: Signiere mit deinem PFX-Zertifikat (wenn vorhanden)
+    - name: 🔐 Decode the PFX
+      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
+      run: |
+        $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
+        $certificatePath = "$env:Build_Output_Directory/license.pfx"
+        [IO.File]::WriteAllBytes($certificatePath, $pfx_cert_byte)
+      shell: pwsh
+
+    # Optionales App-Packaging (falls du irgendwann ein AppX-Bundle brauchst)
+    - name: 📦 Create App Package
+      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
+      run: |
+        msbuild $env:Directory `
+          /p:Configuration=${{ matrix.configuration }} `
+          /p:UapAppxPackageBuildMode=StoreUpload `
+          /p:AppxBundle=Always `
+          /p:PackageCertificateKeyFile=license.pfx `
+          /p:PackageCertificatePassword=${{ secrets.Pfx_Key }}
+      shell: pwsh
+
+    - name: 🧹 Remove the PFX
+      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
+      run: Remove-Item -Path "$env:Build_Output_Directory/license.pfx"
+      shell: pwsh
+
+    - name: ☁️ Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build Output (${{ matrix.configuration }})
+        path: ${{ env.Build_Output_Directory }}/${{ matrix.configuration }}
