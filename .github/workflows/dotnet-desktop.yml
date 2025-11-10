@@ -20,9 +20,6 @@ jobs:
       Build_Output_Directory: x86/Mbed.Uploader/bin
       Directory: x86/Mbed.Uploader
 
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
     steps:
     - name: 🧱 Checkout
       uses: actions/checkout@v4
@@ -69,74 +66,8 @@ jobs:
       run: Remove-Item -Path "$env:Build_Output_Directory/license.pfx"
       shell: pwsh
 
-    - name: 🔍 Extract Assembly Version
-      id: version
-      shell: pwsh
-      run: |
-        $assemblyInfo = Get-ChildItem -Recurse -Filter "AssemblyInfo.cs" | Get-Content -Raw
-        if ($assemblyInfo -match 'AssemblyVersion\("([^"]+)"\)') {
-          $version = $matches[1]
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "📦 AssemblyVersion: $version"
-        } else {
-          Write-Host "⚠️ Keine AssemblyVersion gefunden!"
-          exit 1
-        }
-    - name: 🧩 Prepare EXE Artifact
-      shell: pwsh
-      run: |
-        $src = "$env:Output_Dir/${{ matrix.configuration }}"
-        $exe = Get-ChildItem $src -Filter "*.exe" | Select-Object -First 1
-        $newName = if ("${{ matrix.configuration }}" -eq "Debug") {
-          "$($exe.BaseName)_debug.exe"
-        } else {
-          "$($exe.BaseName).exe"
-        }
-        Copy-Item $exe.FullName $newName
-        echo "exe_name=$newName" >> $env:GITHUB_ENV
-        Write-Host "✅ Prepared $newName"
-
-    - name: ☁️ Upload Artifact
+    - name: ☁️ Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.exe_name }}
-        path: ${{ env.exe_name }}
-        
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: 📦 Download all build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./release-files
-
-    - name: 🧾 Generate Changelog
-      id: changelog
-      run: |
-        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [ -z "$LAST_TAG" ]; then
-          echo "📜 First release, showing all commits."
-          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
-        else
-          echo "📜 Commits since $LAST_TAG:"
-          COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
-        fi
-        echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        echo "$COMMITS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-    - name: 🏷️ Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ needs.build.outputs.version }}
-        name: "Release v${{ needs.build.outputs.version }}"
-        body: |
-          ## 🚀 Version ${{ needs.build.outputs.version }}
-          **Release Date:** $(date +"%Y-%m-%d")
-
-          ### 🧾 Commits since last release:
-          ${{ steps.changelog.outputs.changelog }}
-        files: ./release-files/**
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Build Output (${{ matrix.configuration }})
+        path: ${{ env.Build_Output_Directory }}/${{ matrix.configuration }}
