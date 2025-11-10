@@ -45,7 +45,6 @@ jobs:
 
     # Optional: Signiere mit deinem PFX-Zertifikat (wenn vorhanden)
     - name: 🔐 Decode the PFX
-      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
         $certificatePath = "$env:Build_Output_Directory/license.pfx"
@@ -54,7 +53,6 @@ jobs:
 
     # Optionales App-Packaging (falls du irgendwann ein AppX-Bundle brauchst)
     - name: 📦 Create App Package
-      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
       run: |
         msbuild $env:Directory `
           /p:Configuration=${{ matrix.configuration }} `
@@ -65,7 +63,6 @@ jobs:
       shell: pwsh
 
     - name: 🧹 Remove the PFX
-      if: ${{ secrets.Base64_Encoded_Pfx != '' }}
       run: Remove-Item -Path "$env:Build_Output_Directory/license.pfx"
       shell: pwsh
 
