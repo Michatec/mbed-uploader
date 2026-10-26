@@ -29,7 +29,7 @@ jobs:
     - name: 🧩 Install .NET 8 SDK
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: 10.0.402
+        dotnet-version: 10.0.403
 
     - name: ⚙️ Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v3
